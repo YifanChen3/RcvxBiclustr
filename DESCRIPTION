@@ -1,0 +1,12 @@
+Package: RcvxBiclustr
+Type: Package
+Title: Robust Convex Biclustering
+Version: 0.5.9
+Author: Yifan Chen, Chuanquan Li, Chunyin Lei
+Maintainer: Yifan Chen <chenyifan003@gmail.com>
+Description: Robust version of convex biclustering. Both tuning-free and manually-selected. Trying to update to Github.
+Depends: R (>= 2.15.2), Matrix, igraph, gdata, Rcpp
+License: What license is it under?
+Encoding: UTF-8
+Imports: Rcpp (>= 1.0.7)
+LinkingTo: Rcpp, RcppArmadillo
