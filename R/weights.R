@@ -18,8 +18,36 @@
 #' @import gdata
 #' @export
 #' @return A vector \cite{wt} of weights for robust convex clustering.
-robust_weights <- function(X, delta, zeta){
+
+tri2vec <- function(i,j,n) {
+  return(n*(i-1) - i*(i-1)/2 + j -i)
+}
+
+knn_weights <- function(w,k,n) {
+  i <- 1
+  neighbors <- tri2vec(i,(i+1):n,n)
+  keep <- neighbors[sort(w[neighbors],decreasing=TRUE,index.return=TRUE)$ix[1:k]]
+  for (i in 2:(n-1)) {
+    group_A <- tri2vec(i,(i+1):n,n)
+    group_B <- tri2vec(1:(i-1),i,n)
+    neighbors <- c(group_A,group_B)
+    knn <- neighbors[sort(w[neighbors],decreasing=TRUE,index.return=TRUE)$ix[1:k]]
+    keep <- union(knn,keep)
+  }
+  i <- n
+  neighbors <- tri2vec(1:(i-1),i,n)
+  knn <- neighbors[sort(w[neighbors],decreasing=TRUE,index.return=TRUE)$ix[1:k]]
+  keep <- union(knn,keep)
+  if (length(keep) > 0)
+    w[-keep] <- 0
+  return(Matrix(data=w,ncol=1,sparse=TRUE))
+}
+
+robust_weights <- function(X, delta, zeta, k){
+  n <- nrow(X)
   sol <- robustweights(X=X,delta=delta,zeta=zeta)
   weights <- lowerTriangle(sol)
-  return(weights/max(weights))
+  weights <- as.numeric(knn_weights(weights,k,n))
+  weights <- weights/sqrt(n)
+  return(weights)
 }

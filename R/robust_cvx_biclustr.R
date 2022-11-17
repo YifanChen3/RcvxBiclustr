@@ -61,7 +61,7 @@
 
 
 robust_cvx_biclustr <- function(X,W1=NULL,W2=NULL,V1=NULL,V2=NULL,Y1=NULL,Y2=NULL,Z1=NULL,Z2=NULL,
-                                max_iter=1e3, rho,lambda,wt_row,wt_col,tol_abs=1e-05){
+                                max_iter=700, rho,lambda,wt_row,wt_col,tol_abs=1e-05){
   n <- as.integer(nrow(X))
   p <- as.integer(ncol(X))
   E1 <- create_E_matrix(n)$E
@@ -103,13 +103,13 @@ robust_cvx_biclustr <- function(X,W1=NULL,W2=NULL,V1=NULL,V2=NULL,Y1=NULL,Y2=NUL
   sol = robust_convex_bicluster(X=X,W1=W1,W2=W2,V1=V1,V2=V2,Y1=Y1,Y2=Y2,Z1=Z1,Z2=Z2,
                                 E1=E1,E2=E2,max_iter=max_iter,tol_abs=tol_abs,
                                 lambda=lambda,rho=rho,wt_row=wt_row,wt_col=wt_col)
-  return(list(U=sol$U,V_row=sol$V_row,V_col=sol$V_col,iter=sol$iter,tol=sol$tol))
+  return(list(U=sol$U,V_row=sol$V_row,V_col=sol$V_col,iter=sol$iter,tol=sol$tol,tau=sol$tau))
 }
 
 
 
 robust_cvx_biclustr_naive <- function(X,W1=NULL,W2=NULL,V1=NULL,V2=NULL,Y1=NULL,Y2=NULL,Z1=NULL,Z2=NULL,
-                                      max_iter=1e4,rho,tau,lambda,wt_row,wt_col,tol_abs=1e-05){
+                                      max_iter=700,rho,tau,lambda,wt_row,wt_col,tol_abs=1e-05){
   n <- as.integer(nrow(X))
   p <- as.integer(ncol(X))
   E1 <- create_E_matrix(n)$E

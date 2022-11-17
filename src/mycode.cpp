@@ -33,6 +33,16 @@ double mad(const arma::vec& x) {
     return 1.482602 * median(abs(x - median(x)));
 }
 
+double quantile(arma::vec& x, double q){
+    int n = x.size();
+    double i = (n-1)*q;
+    int low = floor(i);
+    int high = ceil(i);
+    double qs = x(low);
+    double h = (i-low);
+    return (1.0 - h) * qs + h * x(high);
+}
+
 //[[Rcpp::export]]
 NumericVector robustweights(NumericMatrix X, double delta=15.0, double zeta=0.1) {
     int n = X.nrow(), p=X.ncol();
@@ -189,6 +199,27 @@ arma::mat update_Y(arma::mat& Y_old, arma::mat& U, arma::mat& V, arma::mat E, do
     return Y;
 }
 
+// update s
+
+int update_s(arma::mat V){
+    int V_row = V.n_rows, V_col = V.n_cols;
+    int i,j;
+    int count;
+    int s = V_row;
+    for (i=0;i<V_row;i++){
+        count = 0;
+        for (j=0;j<V_col;j++){
+            if (V(i,j)==0){
+                count++;
+            }
+        }
+        if (count==V_col){
+            s = s - 1;
+        }
+    }
+    return s;
+}
+
 
 double tolerance(arma::mat W, arma::mat W_old){
     int n = W.n_rows, p=W.n_cols;
@@ -207,100 +238,6 @@ double tolerance(arma::mat W, arma::mat W_old){
 //Might have issue on adding a U as parameter
 
 arma::mat robust_convex_cluster(arma::mat& X, arma::mat& W, arma::mat& V, arma::mat& Y,
-                          arma::mat& Z, arma::mat E, int max_iter, double tol_abs,
-                          double lambda, double rho, arma::vec wt){
-    int n = X.n_rows, p=X.n_cols;
-    int np = n*p;
-    double rhs = log(np)/np;
-    double tau = 1.345 * mad(arma::vectorise(X));
-    int it;
-    //int iter;
-    double tol;
-    //arma::vec wt1 = as<arma::arma::vec>(wt);
-    arma::mat U(n,p,fill::zeros);
-    //U = as<arma::arma::mat>(U_temp);
-
-    for (it=0; it<max_iter; it++){
-        arma::mat W_old=W;
-        arma::mat Y_old=Y;
-        arma::mat Z_old=Z;
-
-        U=update_U(V,Y,Z,W,E);
-        W=update_W(X,U,Z,tau,rho);
-        V=update_V(U,Y,E,wt,lambda,rho);
-        Y=update_Y(Y_old,U,V,E,rho);
-        Z=update_Z(Z_old,U,W,rho);
-
-        arma::vec res = arma::vectorise(X)-arma::vectorise(U);
-        arma::vec resSq = square(res);
-        tau = sqrt((long double)rootf1(resSq, np, rhs, min(resSq), accu(resSq)));
-
-        tol = tolerance(W,W_old);
-        if (tol<tol_abs){
-            break;
-        }
-    }
-    //if (it > max_iter){
-    //    iter = max_iter;
-    //}
-    //else{
-    //    iter = it;
-    //}
-    return U; //Or maybe return W????
-}
-
-//[[Rcpp::export]]
-List robust_convex_bicluster(arma::mat& X, arma::mat& W1, arma::mat& W2, arma::mat& V1,
-                             arma::mat& V2, arma::mat& Y1, arma::mat& Y2, arma::mat& Z1,
-                             arma::mat& Z2, arma::mat E1, arma::mat E2,
-                             int max_iter, double tol_abs,
-                             double lambda, double rho, arma::vec wt_row, arma::vec wt_col){
-    int n = X.n_rows, p=X.n_cols;
-    int its,iter;
-    double tol;
-    arma::mat P = zeros(n,p);
-    arma::mat Q = zeros(p,n);
-    arma::mat U = X;
-    arma::mat R = trans(U);
-    int max_iter_row = 1000;
-    int max_iter_col = 1000;
-
-
-    //main loop
-    for (its=0;its<=max_iter;its++){
-
-        arma::mat UTPT = trans(U)+trans(P);
-        R = robust_convex_cluster(UTPT,W2,V2,Y2,Z2,E2,max_iter_row,tol_abs,lambda,rho,wt_col);
-        P = P + U - trans(R);
-
-        arma::mat RTQT = trans(R)+trans(Q);
-        U = robust_convex_cluster(RTQT,W1,V1,Y1,Z1,E1,max_iter_col,tol_abs,lambda,rho,wt_row);
-        Q = Q + R - trans(U);
-
-        tol = tolerance(U,trans(R));
-        if (tol < tol_abs) {
-            break;
-        }
-    }
-
-    if (its >= max_iter) {
-        iter = max_iter;
-    }
-    else {
-        iter = its;
-    }
-
-    List a = List::create(_["U"]=wrap(U),
-                          _["V_row"]=wrap(V1),
-                          _["V_col"]=wrap(V2),
-                          _["iter"]=wrap(iter),
-                          _["tol"]=wrap(tol));
-    return a;
-}
-
-
-// Non-tuning-free Method
-arma::mat robust_convex_cluster_naive(arma::mat& X, arma::mat& W, arma::mat& V, arma::mat& Y,
                                 arma::mat& Z, arma::mat E, int max_iter, double tol_abs,
                                 double lambda, double rho, double tau, arma::vec wt){
     int n = X.n_rows, p=X.n_cols;
@@ -323,7 +260,7 @@ arma::mat robust_convex_cluster_naive(arma::mat& X, arma::mat& W, arma::mat& V, 
         Z=update_Z(Z_old,U,W,rho);
 
         tol = tolerance(W,W_old);
-        if (tol<tol_abs){
+        if (tol<tol_abs*n*p){
             break;
         }
     }
@@ -333,15 +270,82 @@ arma::mat robust_convex_cluster_naive(arma::mat& X, arma::mat& W, arma::mat& V, 
     //else{
     //    iter = it;
     //}
-    return U; //Or maybe return W????
+    return W; //Same as return U
 }
 
 //[[Rcpp::export]]
-List robust_convex_bicluster_naive(arma::mat& X, arma::mat& W1, arma::mat& W2, arma::mat& V1,
+List robust_convex_bicluster(arma::mat& X, arma::mat& W1, arma::mat& W2, arma::mat& V1,
                              arma::mat& V2, arma::mat& Y1, arma::mat& Y2, arma::mat& Z1,
                              arma::mat& Z2, arma::mat E1, arma::mat E2,
                              int max_iter, double tol_abs,
-                             double lambda, double rho, double tau, arma::vec wt_row, arma::vec wt_col){
+                             double lambda, double rho, arma::vec wt_row, arma::vec wt_col){
+    int n = X.n_rows, p=X.n_cols;
+    int its,iter;
+    double tol;
+    int np = n*p;
+    double rhs = log(np*np)/np;
+    double tau = 1.345 * mad(arma::vectorise(X));
+
+    arma::mat P = zeros(n,p);
+    arma::mat Q = zeros(p,n);
+    arma::mat U = X;
+    arma::mat R = trans(U);
+    int max_iter_row = 1000;
+    int max_iter_col = 1000;
+    int s1, s2, s;
+
+    //main loop
+    for (its=0;its<=max_iter;its++){
+
+        arma::mat UTPT = trans(U)+trans(P);
+        R = robust_convex_cluster(UTPT,W2,V2,Y2,Z2,E2,max_iter_row,tol_abs,lambda,rho,tau,wt_col);
+        P = P + U - trans(R);
+
+        arma::mat RTQT = trans(R)+trans(Q);
+        U = robust_convex_cluster(RTQT,W1,V1,Y1,Z1,E1,max_iter_col,tol_abs,lambda,rho,tau,wt_row);
+        Q = Q + R - trans(U);
+
+        s1 = update_s(V1);
+        s2 = update_s(V2);
+        s = std::min(s1,s2);
+        rhs = rhs * ((np-s)/np);
+
+        arma::vec res = arma::vectorise(X)-arma::vectorise(U);
+        arma::vec resSq = arma::square(res);
+        tau = sqrt((long double)rootf1(resSq, np, rhs, min(resSq), quantile(resSq,0.95)));
+
+        tol = tolerance(U,trans(R));
+
+        if (tol < tol_abs*n*p) {
+            break;
+        }
+    }
+
+    if (its >= max_iter) {
+        iter = max_iter;
+    }
+    else {
+        iter = its;
+    }
+
+    List a = List::create(_["U"]=wrap(U),
+                          _["V_row"]=wrap(V1),
+                          _["V_col"]=wrap(V2),
+                          _["iter"]=wrap(iter),
+                          _["tol"]=wrap(tol),
+                          _["tau"]=wrap(tau));
+    return a;
+}
+
+
+// Non-tuning-free Method
+
+//[[Rcpp::export]]
+List robust_convex_bicluster_naive(arma::mat& X, arma::mat& W1, arma::mat& W2, arma::mat& V1,
+                                   arma::mat& V2, arma::mat& Y1, arma::mat& Y2, arma::mat& Z1,
+                                   arma::mat& Z2, arma::mat E1, arma::mat E2,
+                                   int max_iter, double tol_abs,
+                                   double lambda, double rho, double tau, arma::vec wt_row, arma::vec wt_col){
     int n = X.n_rows, p=X.n_cols;
     int its,iter;
     double tol;
@@ -357,15 +361,15 @@ List robust_convex_bicluster_naive(arma::mat& X, arma::mat& W1, arma::mat& W2, a
     for (its=0;its<=max_iter;its++){
 
         arma::mat UTPT = trans(U)+trans(P);
-        R = robust_convex_cluster_naive(UTPT,W2,V2,Y2,Z2,E2,max_iter_row,tol_abs,lambda,rho,tau,wt_col);
+        R = robust_convex_cluster(UTPT,W2,V2,Y2,Z2,E2,max_iter_row,tol_abs,lambda,rho,tau,wt_col);
         P = P + U - trans(R);
 
         arma::mat RTQT = trans(R)+trans(Q);
-        U = robust_convex_cluster_naive(RTQT,W1,V1,Y1,Z1,E1,max_iter_col,tol_abs,lambda,rho,tau,wt_row);
+        U = robust_convex_cluster(RTQT,W1,V1,Y1,Z1,E1,max_iter_col,tol_abs,lambda,rho,tau,wt_row);
         Q = Q + R - trans(U);
 
         tol = tolerance(U,trans(R));
-        if (tol < tol_abs) {
+        if (tol < tol_abs*n*p) {
             break;
         }
     }
