@@ -1,10 +1,10 @@
 Package: RcvxBiclustr
 Type: Package
 Title: Robust Convex Biclustering
-Version: 0.6.1
+Version: 0.7.2
 Author: Yifan Chen, Chuanquan Li, Chunyin Lei
 Maintainer: Yifan Chen <chenyifan003@gmail.com>
-Description: Added tri2vec
+Description: Put the weight function into rcbc function
 Depends: R (>= 2.15.2), Matrix, igraph, gdata, Rcpp
 License: What license is it under?
 Encoding: UTF-8
